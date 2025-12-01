@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.1 (2025.11.12)'
+VERSION='v1.3.0 (2025.11.12)'
 
 # 各变量默认值
 GH_PROXY='https://hub.glowp.xyz/'
