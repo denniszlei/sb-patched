@@ -54,28 +54,28 @@ jobs:
           # Patch 1: Update version and add SCRIPT_SOURCE
           sed -i "s|^VERSION='\(v[^']*\)'|VERSION='\1-patched'|" sing-box.sh
           sed -i "/^VERSION=/a\\
-\\
-# Custom script source for sb shortcut\\
-SCRIPT_SOURCE='${REPO_URL}/raw/main/sing-box.sh'" sing-box.sh
+          \\
+          # Custom script source for sb shortcut\\
+          SCRIPT_SOURCE='${REPO_URL}/raw/main/sing-box.sh'" sing-box.sh
 
           # Patch 2: Disable statistics collection
           sed -i '/^# 脚本当天及累计运行次数统计$/,/^}$/ {
             /^statistics_of_run-times() {$/,/^}$/ c\
-statistics_of_run-times() {\
-  return 0\
-}
+            statistics_of_run-times() {\
+              return 0\
+            }
           }' sing-box.sh
 
           # Patch 3: Fix Shadowsocks 2022 password generation
           sed -i '/NODE_NAME\[15\].*SHADOWSOCKS_METHOD/a\
-    # Auto-generate correct password for 2022 ciphers\
-    if [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-128 ]]; then\
-      SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 16)"}\
-    elif [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-256 ]]; then\
-      SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 32)"}\
-    else\
-      SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$UUID_CONFIRM"}\
-    fi' sing-box.sh
+          # Auto-generate correct password for 2022 ciphers\
+          if [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-128 ]]; then\
+            SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 16)"}\
+          elif [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-256 ]]; then\
+            SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 32)"}\
+          else\
+            SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$UUID_CONFIRM"}\
+          fi' sing-box.sh
           
           # Patch 3b: Replace password variable in Shadowsocks config
           sed -i 's/"password":"${UUID\[15\]}"/"password":"${SHADOWSOCKS_PASSWORD}"/' sing-box.sh
