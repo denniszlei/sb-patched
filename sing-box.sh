@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.0 (2025.11.12)'
+VERSION='v1.3.1 (2025.11.12)-patched'
+
+# Custom script source for sb shortcut
+SCRIPT_SOURCE='https://github.com/denniszlei/sb-patched/raw/main/sing-box.sh'
 
 # 各变量默认值
 GH_PROXY='https://hub.glowp.xyz/'
@@ -306,16 +309,9 @@ check_chatgpt() {
 }
 
 # 脚本当天及累计运行次数统计
-statistics_of_run-times() {
-  local UPDATE_OR_GET=$1
-  local SCRIPT=$2
-  if grep -q 'update' <<< "$UPDATE_OR_GET"; then
-    { wget --no-check-certificate -qO- --timeout=3 "https://stat.cloudflare.now.cc/api/updateStats?script=${SCRIPT}" > $TEMP_DIR/statistics 2>/dev/null || true; }&
-  elif grep -q 'get' <<< "$UPDATE_OR_GET"; then
-    [ -s $TEMP_DIR/statistics ] && [[ $(cat $TEMP_DIR/statistics) =~ \"todayCount\":([0-9]+),\"totalCount\":([0-9]+) ]] && local TODAY="${BASH_REMATCH[1]}" && local TOTAL="${BASH_REMATCH[2]}" && rm -f $TEMP_DIR/statistics
-    hint "\n*******************************************\n\n $(text 55) \n"
-  fi
-}
+  statistics_of_run-times() {
+    return 0
+  }
 
 # 选择中英语言
 select_language() {
@@ -1792,6 +1788,14 @@ EOF
   if [[ "${INSTALL_PROTOCOLS[@]}" =~ "$CHECK_PROTOCOLS" ]]; then
     [ -z "$PORT_SHADOWSOCKS" ] && PORT_SHADOWSOCKS=$[START_PORT+$(awk -v target=$CHECK_PROTOCOLS '{ for(i=1; i<=NF; i++) if($i == target) { print i-1; break } }' <<< "${INSTALL_PROTOCOLS[*]}")]
     NODE_NAME[15]=${NODE_NAME[15]:-"$NODE_NAME_CONFIRM"} && UUID[15]=${UUID[15]:-"$UUID_CONFIRM"} && SHADOWSOCKS_METHOD=${SHADOWSOCKS_METHOD:-"aes-128-gcm"}
+# Auto-generate correct password for 2022 ciphers
+if [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-128 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 16)"}
+elif [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-256 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 32)"}
+else
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$UUID_CONFIRM"}
+fi
     cat > ${WORK_DIR}/conf/15_${NODE_TAG[4]}_inbounds.json << EOF
 {
     "inbounds":[
@@ -1801,7 +1805,7 @@ EOF
             "listen":"::",
             "listen_port":$PORT_SHADOWSOCKS,
             "method":"${SHADOWSOCKS_METHOD}",
-            "password":"${UUID[15]}",
+            "password":"${SHADOWSOCKS_PASSWORD}",
             "multiplex":{
                 "enabled":true,
                 "padding":true,
@@ -2266,6 +2270,14 @@ fetch_nodes_value() {
 
   # 获取 Shadowsocks key-value
   [ -s ${WORK_DIR}/conf/*_${NODE_TAG[4]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[4]}_inbounds.json) && NODE_NAME[15]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[4]}.*/\1/p" <<< "$JSON") && PORT_SHADOWSOCKS=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && UUID[15]=$(awk -F '"' '/"password"/{print $4}' <<< "$JSON") && SHADOWSOCKS_METHOD=$(awk -F '"' '/"method"/{print $4}' <<< "$JSON")
+# Auto-generate correct password for 2022 ciphers
+if [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-128 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 16)"}
+elif [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-256 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 32)"}
+else
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$UUID_CONFIRM"}
+fi
 
   # 获取 Trojan key-value
   [ -s ${WORK_DIR}/conf/*_${NODE_TAG[5]}_inbounds.json ] && local JSON=$(cat ${WORK_DIR}/conf/*_${NODE_TAG[5]}_inbounds.json) && NODE_NAME[16]=$(sed -n "s/.*\"tag\":\"\(.*\) ${NODE_TAG[5]}.*/\1/p" <<< "$JSON") && PORT_TROJAN=$(sed -n 's/.*"listen_port":\([0-9]\+\),/\1/gp' <<< "$JSON") && TROJAN_PASSWORD=$(awk -F '"' '/"password"/{print $4}' <<< "$JSON")
@@ -2431,6 +2443,14 @@ export_list() {
 "
 
   [ -n "$PORT_SHADOWSOCKS" ] && local CLASH_SHADOWSOCKS="- {name: \"${NODE_NAME[15]} ${NODE_TAG[4]}\", type: ss, server: ${SERVER_IP}, port: $PORT_SHADOWSOCKS, cipher: ${SHADOWSOCKS_METHOD}, password: ${UUID[15]}, smux: { enabled: true, protocol: 'h2mux', padding: true, max-connections: '8', min-streams: '16', statistic: true, only-tcp: false }, brutal-opts: { enabled: ${IS_BRUTAL}, up: '1000 Mbps', down: '1000 Mbps' } }" &&
+# Auto-generate correct password for 2022 ciphers
+if [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-128 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 16)"}
+elif [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-256 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 32)"}
+else
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$UUID_CONFIRM"}
+fi
   local CLASH_SUBSCRIBE+="
   $CLASH_SHADOWSOCKS
 "
@@ -2809,6 +2829,14 @@ anytls://${UUID[21]}@${SERVER_IP_1}:${PORT_ANYTLS}/?insecure=1#${NODE_NAME[21]}%
 
   [ -n "$PORT_SHADOWSOCKS" ] &&
   local INBOUND_REPLACE+=" { \"type\": \"shadowsocks\", \"tag\": \"${NODE_NAME[15]} ${NODE_TAG[4]}\", \"server\": \"${SERVER_IP}\", \"server_port\": $PORT_SHADOWSOCKS, \"method\": \"${SHADOWSOCKS_METHOD}\", \"password\": \"${UUID[15]}\", \"multiplex\": { \"enabled\": true, \"protocol\": \"h2mux\", \"max_connections\": 8, \"min_streams\": 16, \"padding\": true, \"brutal\":{ \"enabled\":${IS_BRUTAL}, \"up_mbps\":1000, \"down_mbps\":1000 } } }," &&
+# Auto-generate correct password for 2022 ciphers
+if [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-128 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 16)"}
+elif [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-256 ]]; then
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 32)"}
+else
+  SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$UUID_CONFIRM"}
+fi
   local NODE_REPLACE+="\"${NODE_NAME[15]} ${NODE_TAG[4]}\","
 
   [ -n "$PORT_TROJAN" ] &&
@@ -3012,7 +3040,7 @@ create_shortcut() {
   cat > ${WORK_DIR}/sb.sh << EOF
 #!/usr/bin/env bash
 
-bash <(wget --no-check-certificate -qO- https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh) \$1
+bash <(wget --no-check-certificate -qO- ${SCRIPT_SOURCE}) \$1
 EOF
   chmod +x ${WORK_DIR}/sb.sh
   ln -sf ${WORK_DIR}/sb.sh /usr/bin/sb
