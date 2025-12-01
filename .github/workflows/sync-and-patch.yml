@@ -1,0 +1,120 @@
+name: Sync and Patch sing-box.sh
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  sync-and-patch:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fetch upstream script
+        run: |
+          wget -q https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh -O sing-box-upstream.sh
+          
+      - name: Check if upstream changed
+        id: check
+        run: |
+          # Get upstream version
+          UPSTREAM_VERSION=$(grep "^VERSION=" sing-box-upstream.sh | head -1)
+          echo "Upstream: $UPSTREAM_VERSION"
+          
+          # Get current patched version (extract original version)
+          if [ -f sing-box.sh ]; then
+            CURRENT_VERSION=$(grep "^VERSION=" sing-box.sh | head -1 | sed 's/-patched.*//; s/VERSION=//')
+            echo "Current base: $CURRENT_VERSION"
+          else
+            CURRENT_VERSION=""
+          fi
+          
+          # Compare
+          UPSTREAM_BASE=$(echo "$UPSTREAM_VERSION" | sed "s/VERSION=//")
+          if [ "$CURRENT_VERSION" != "$UPSTREAM_BASE" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$UPSTREAM_BASE" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Apply patches
+        if: steps.check.outputs.changed == 'true'
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          cp sing-box-upstream.sh sing-box.sh
+          
+          # Patch 1: Update version and add SCRIPT_SOURCE
+          sed -i "s|^VERSION='\(v[^']*\)'|VERSION='\1-patched'|" sing-box.sh
+          sed -i "/^VERSION=/a\\
+\\
+# Custom script source for sb shortcut\\
+SCRIPT_SOURCE='${REPO_URL}/raw/main/sing-box.sh'" sing-box.sh
+
+          # Patch 2: Disable statistics collection
+          sed -i '/^# 脚本当天及累计运行次数统计$/,/^}$/ {
+            /^statistics_of_run-times() {$/,/^}$/ c\
+statistics_of_run-times() {\
+  return 0\
+}
+          }' sing-box.sh
+
+          # Patch 3: Fix Shadowsocks 2022 password generation
+          sed -i '/NODE_NAME\[15\].*SHADOWSOCKS_METHOD/a\
+    # Auto-generate correct password for 2022 ciphers\
+    if [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-128 ]]; then\
+      SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 16)"}\
+    elif [[ "$SHADOWSOCKS_METHOD" =~ ^2022-blake3-aes-256 ]]; then\
+      SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$($DIR/sing-box generate rand --base64 32)"}\
+    else\
+      SHADOWSOCKS_PASSWORD=${SHADOWSOCKS_PASSWORD:-"$UUID_CONFIRM"}\
+    fi' sing-box.sh
+          
+          # Patch 3b: Replace password variable in Shadowsocks config
+          sed -i 's/"password":"${UUID\[15\]}"/"password":"${SHADOWSOCKS_PASSWORD}"/' sing-box.sh
+
+          # Patch 4: Update shortcut to use SCRIPT_SOURCE
+          sed -i 's|https://raw.githubusercontent.com/fscarmen/sing-box/main/sing-box.sh|${SCRIPT_SOURCE}|g' sing-box.sh
+
+      - name: Verify patches
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          echo "=== Verifying patches ==="
+          
+          echo -n "1. Version patched: "
+          grep -q "\-patched" sing-box.sh && echo "✓" || echo "✗"
+          
+          echo -n "2. SCRIPT_SOURCE added: "
+          grep -q "^SCRIPT_SOURCE=" sing-box.sh && echo "✓" || echo "✗"
+          
+          echo -n "3. Statistics disabled: "
+          grep -A1 "^statistics_of_run-times()" sing-box.sh | grep -q "return 0" && echo "✓" || echo "✗"
+          
+          echo -n "4. SS2022 password logic: "
+          grep -q "2022-blake3-aes-128" sing-box.sh && echo "✓" || echo "✗"
+          
+          echo -n "5. Shortcut uses SCRIPT_SOURCE: "
+          grep -q '${SCRIPT_SOURCE}' sing-box.sh && echo "✓" || echo "✗"
+
+      - name: Commit and push
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          rm -f sing-box-upstream.sh
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sing-box.sh
+          git commit -m "Sync with upstream ${{ steps.check.outputs.version }} and apply patches"
+          git push
+
+      - name: No changes
+        if: steps.check.outputs.changed == 'false'
+        run: |
+          echo "No upstream changes detected. Current version is up to date."
+          rm -f sing-box-upstream.sh
