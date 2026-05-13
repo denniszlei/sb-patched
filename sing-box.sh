@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.11 (2026.05.06)-patched'
+VERSION='v1.3.11 (2026.05.12)-patched'
 
 # Custom script source for sb shortcut
 SCRIPT_SOURCE='https://github.com/denniszlei/sb-patched/raw/main/sing-box.sh'
@@ -2148,6 +2148,10 @@ collect_exposed_ports() {
       *hysteria2_inbounds.json|*tuic_inbounds.json )
         append_unique_port EXPOSED_UDP_PORTS "$PORT"
         ;;
+      *naive_inbounds.json )
+        append_unique_port EXPOSED_TCP_PORTS "$PORT"
+        append_unique_port EXPOSED_UDP_PORTS "$PORT"
+        ;;
       *vmess-ws_inbounds.json|*vless-ws-tls_inbounds.json )
         [ "$HAS_NGINX" = false ] && append_unique_port EXPOSED_TCP_PORTS "$PORT"
         ;;
@@ -2354,6 +2358,10 @@ sync_firewall_rules() {
 
     case "$BASENAME" in
       *hysteria2_inbounds.json|*tuic_inbounds.json )
+        append_unique_port EXPOSED_UDP_PORTS "$PORT"
+        ;;
+      *naive_inbounds.json )
+        append_unique_port EXPOSED_TCP_PORTS "$PORT"
         append_unique_port EXPOSED_UDP_PORTS "$PORT"
         ;;
       *vmess-ws_inbounds.json|*vless-ws-tls_inbounds.json )
