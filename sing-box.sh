@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 当前脚本版本号
-VERSION='v1.3.14 (2026.06.20)-patched'
+VERSION='v1.3.14 (2026.06.26)-patched'
 
 # Custom script source for sb shortcut
 SCRIPT_SOURCE='https://github.com/denniszlei/sb-patched/raw/main/sing-box.sh'
@@ -5284,7 +5284,7 @@ change_protocols() {
 
   # 用于新节点的配置信息
   if [ "${#UUID[@]}" -gt 0 ]; then
-    UUID_CONFIRM="${UUID[0]}"
+    UUID_CONFIRM="$(printf "%s\n" "${UUID[@]}" | grep -m 1 . )"
   elif grep -q '.' <<< "${TROJAN_PASSWORD}"; then
     UUID_CONFIRM="${TROJAN_PASSWORD}"
   else
