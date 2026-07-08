@@ -1284,7 +1284,7 @@ custom_route_compact_rules() {
       (if (($domains | length) + ($sets | length)) > 0 then
         [((if ($sets | length) > 0 then {rule_set:$sets} else {} end)
           + (if ($domains | length) > 0 then {domain_suffix:$domains} else {} end)
-          + {outbound:"warp-ep"})]
+          + {action:"route", outbound:"warp-ep"})]
       else [] end)
     )
   ' "$CUSTOM_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$CUSTOM_FILE"
@@ -1439,7 +1439,7 @@ custom_route_add() {
         (if (($new_domains | length) + ($new_sets | length)) > 0 then
           [((if ($new_sets | length) > 0 then {rule_set:$new_sets} else {} end)
             + (if ($new_domains | length) > 0 then {domain_suffix:$new_domains} else {} end)
-            + {outbound:$out})]
+            + {action:"route", outbound:$out})]
         else [] end)
       )
     ' "$CUSTOM_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$CUSTOM_FILE"
@@ -1477,7 +1477,7 @@ custom_route_add() {
         (if (($new_domains | length) + ($new_sets | length)) > 0 then
           [((if ($new_sets | length) > 0 then {rule_set:$new_sets} else {} end)
             + (if ($new_domains | length) > 0 then {domain_suffix:$new_domains} else {} end)
-            + {outbound:$out})]
+            + {action:"route", outbound:$out})]
         else [] end)
       )
     ' "$CUSTOM_FILE" > "$TMP_FILE" && mv "$TMP_FILE" "$CUSTOM_FILE"
